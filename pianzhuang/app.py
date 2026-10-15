@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import queue
+import re
 import sys
 import threading
 import time
@@ -22,7 +23,7 @@ from pianzhuang.jobs import audio_items, convert_items, summary_items
 from pianzhuang.media import available_audio_formats, encoder_text, probe_media
 from pianzhuang.models import AUDIO_FORMATS, CONTAINERS, PRESETS, Kind, MediaItem, Settings
 from pianzhuang.sendto import install_sendto, sendto_link_path
-from pianzhuang.drop import DropManager
+from tkinterdnd2 import DND_FILES, TkinterDnD
 
 BG = "#141613"
 PANEL = "#1E211C"
@@ -61,9 +62,13 @@ FILE_TYPES = [
 ]
 
 
-class App(ctk.CTk):
+class App(ctk.CTk, TkinterDnD.DnDWrapper):
     def __init__(self, initial_paths: list[Path] | None = None) -> None:
         super().__init__()
+        try:
+            self.TkdndVersion = TkinterDnD._require(self)
+        except Exception:
+            self.TkdndVersion = None
         self.title("光影工坊")
         self.geometry("1120x760")
         self.minsize(980, 680)
@@ -201,6 +206,7 @@ class App(ctk.CTk):
         parent.grid_rowconfigure(3, weight=1)
 
         drop = ctk.CTkFrame(parent, fg_color=DROP, border_width=1, border_color=ACCENT, corner_radius=16, height=168)
+        self.drop_frame = drop
         drop.grid(row=0, column=0, sticky="ew", padx=16, pady=(16, 10))
         drop.grid_propagate(False)
         drop.grid_columnconfigure(0, weight=1)
@@ -435,23 +441,57 @@ class App(ctk.CTk):
         for child in widget.winfo_children():
             self._bind_tree(child, callback)
 
+    def _register_drop_target(self, widget) -> None:
+        if not getattr(self, "TkdndVersion", None):
+            return
+        candidates = [widget]
+        for attr in ("_canvas", "_label", "_entry"):
+            sub = getattr(widget, attr, None)
+            if sub is not None:
+                candidates.append(sub)
+        for target in candidates:
+            try:
+                target.drop_target_register(DND_FILES)
+                target.dnd_bind("<<Drop>>", self._on_dnd_drop)
+            except Exception:
+                pass
+
     def _hook_drop(self) -> None:
         if self._drop_hooked or not self.winfo_exists():
             return
+        if not getattr(self, "TkdndVersion", None):
+            self.log("未检测到拖放服务，可通过左侧按钮选择文件。")
+            return
         try:
-            self._drop_manager = DropManager(self, self.add_paths)
-            self._drop_manager.hook()
+            widgets = [
+                self,
+                getattr(self, "drop_frame", None),
+                getattr(self, "queue", None),
+                getattr(self, "empty", None),
+                getattr(self, "stack", None),
+            ]
+            for w in widgets:
+                if w is not None:
+                    self._register_drop_target(w)
             self._drop_hooked = True
-        except Exception as exc:  # noqa: BLE001 - 拖放失败时其他入口仍然可用
-            self.log(f"拖放不可用：{exc}")
+        except Exception as exc:  # noqa: BLE001
+            self.log(f"拖放注册失败：{exc}")
 
-    def _on_drop(self, files) -> None:
-        paths: list[Path] = []
-        for item in files:
-            if isinstance(item, bytes):
-                item = os.fsdecode(item)
-            paths.append(Path(item))
-        self.after(0, lambda: self.add_paths(paths))
+    def _on_dnd_drop(self, event) -> str:
+        raw_data = getattr(event, "data", "")
+        if not raw_data:
+            return getattr(event, "action", "copy") or "copy"
+        try:
+            paths: list[Path] = []
+            for match in re.finditer(r"\{([^}]+)\}|(\S+)", str(raw_data).strip()):
+                val = match.group(1) or match.group(2)
+                if val:
+                    paths.append(Path(val))
+            if paths:
+                self.after(0, lambda: self.add_paths(paths))
+        except Exception as exc:  # noqa: BLE001
+            self.log(f"拖放解析失败：{exc}")
+        return getattr(event, "action", "copy") or "copy"
 
     def _announce_ffmpeg(self) -> None:
         if ffmpeg_path():

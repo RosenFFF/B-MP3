@@ -11,7 +11,7 @@ datas = [
 binaries = []
 hiddenimports = []
 
-for pkg in ("customtkinter",):
+for pkg in ("customtkinter", "tkinterdnd2"):
     d, b, h = collect_all(pkg)
     datas.extend(d)
     binaries.extend(b)

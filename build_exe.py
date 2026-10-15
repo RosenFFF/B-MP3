@@ -31,7 +31,6 @@ def build():
     
     cmd = [
         str(PYINSTALLER),
-        "--clean",
         "-y",
         str(ROOT / "app.spec"),
     ]
