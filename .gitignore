@@ -1,0 +1,30 @@
+# Environments
+.venv/
+env/
+venv/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pytest_cache/
+
+# PyInstaller / Build outputs
+build/
+dist/
+*.egg-info/
+
+# Vendor Binaries (>100MB, Gyan FFmpeg essentials)
+vendor/bin/
+vendor/*.zip
+vendor/
+
+# User outputs & logs
+output/
+test_out/
+*.log
+
+# IDE
+.vscode/
+.idea/
