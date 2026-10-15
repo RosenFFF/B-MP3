@@ -22,6 +22,7 @@ from pianzhuang.jobs import audio_items, convert_items, summary_items
 from pianzhuang.media import available_audio_formats, encoder_text, probe_media
 from pianzhuang.models import AUDIO_FORMATS, CONTAINERS, PRESETS, Kind, MediaItem, Settings
 from pianzhuang.sendto import install_sendto, sendto_link_path
+from pianzhuang.drop import DropManager
 
 BG = "#141613"
 PANEL = "#1E211C"
@@ -438,9 +439,8 @@ class App(ctk.CTk):
         if self._drop_hooked or not self.winfo_exists():
             return
         try:
-            import windnd
-
-            windnd.hook_dropfiles(self, func=self._on_drop, force_unicode=True)
+            self._drop_manager = DropManager(self, self.add_paths)
+            self._drop_manager.hook()
             self._drop_hooked = True
         except Exception as exc:  # noqa: BLE001 - 拖放失败时其他入口仍然可用
             self.log(f"拖放不可用：{exc}")
